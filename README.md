@@ -1,4 +1,4 @@
-# 🛡️ Moteur de scoring anti-fraude Mobile Money
+#  Moteur de scoring anti-fraude Mobile Money
 
 > **Projet d'examen : Bases de données NoSQL**  
 > Master Intelligence Artificielle — Dakar Institute of Technology  
@@ -144,7 +144,7 @@ docker compose exec web1 python manage.py simulate --scenario idempotence
 
 ---
 
-## 🔥 Générer du trafic
+##  Générer du trafic
 
 Exemple : **200 transactions pendant 120 secondes**.
 
@@ -154,7 +154,7 @@ docker compose exec web1 python manage.py simulate --charge 200 --duree 120
 
 ---
 
-# 🔎 Inspecter les données Redis d'un abonné
+#  Inspecter les données Redis d'un abonné
 
 ```bash
 curl -s http://localhost:8080/v1/abonnes/22997000051 | python -m json.tool
