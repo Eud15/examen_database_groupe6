@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Poste de surveillance des transactions</title>
+<style>
+  :root {
+    --papier:   #EDEEE9;
+    --encre:    #22252B;
+    --pale:     #6B7078;
+    --perfo:    #C8CAC3;
+    --accept:   #0F6B4F;
+    --review:   #A8690F;
+    --block:    #A32B1C;
+    --mono: ui-monospace, "IBM Plex Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    padding: 28px 20px 60px;
+    background: var(--papier);
+    color: var(--encre);
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .feuille { max-width: 1180px; margin: 0 auto; }
+
+  /* Ligne de perforation : le motif structurant de toute la page. */
+  .perfo {
+    border: 0;
+    border-top: 1px dashed var(--perfo);
+    margin: 22px 0;
+  }
+
+  header { display: flex; justify-content: space-between; align-items: flex-end; gap: 20px; flex-wrap: wrap; }
+  h1 {
+    font-size: 15px; font-weight: 700; margin: 0;
+    letter-spacing: 0.18em; text-transform: uppercase;
+  }
+  .sous { color: var(--pale); font-size: 11px; letter-spacing: 0.08em; margin-top: 4px; }
+  .horloge { font-size: 11px; color: var(--pale); text-align: right; letter-spacing: 0.06em; }
+  .horloge strong { display: block; font-size: 20px; color: var(--encre); letter-spacing: 0; }
+
+  .grille { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0; }
+  .grille > div { padding: 0 18px; border-left: 1px dashed var(--perfo); }
+  .grille > div:first-child { padding-left: 0; border-left: 0; }
+
+  .etiquette {
+    font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--pale); margin-bottom: 8px;
+  }
+
+  .compte { display: flex; justify-content: space-between; padding: 3px 0; }
+  .compte b { font-weight: 700; font-variant-numeric: tabular-nums; }
+  .a { color: var(--accept); } .r { color: var(--review); } .b { color: var(--block); }
+
+  .chiffre { font-size: 34px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; }
+  .unite { font-size: 12px; color: var(--pale); font-weight: 400; }
+
+  /* Jauge de latence : le budget de 20 ms est matérialisé par un trait. */
+  .jauge { position: relative; height: 8px; background: var(--perfo); margin: 12px 0 6px; }
+  .jauge span { position: absolute; inset: 0 auto 0 0; background: var(--accept); transition: width .45s ease, background .45s ease; }
+  .jauge.depasse span { background: var(--block); }
+  .budget { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--encre); }
+  .legende-jauge { display: flex; justify-content: space-between; font-size: 10px; color: var(--pale); }
+
+  /* Échelle des règles : le cœur de la démonstration. */
+  .regle { display: grid; grid-template-columns: 40px 1fr 52px; align-items: center; gap: 10px; padding: 5px 0; }
+  .regle code { font-weight: 700; letter-spacing: 0.04em; }
+  .regle .piste { height: 6px; background: var(--perfo); position: relative; }
+  .regle .piste i { display: block; height: 100%; background: var(--encre); width: 0; transition: width .5s ease; }
+  .regle .n { text-align: right; font-variant-numeric: tabular-nums; color: var(--pale); }
+  .regle.active code, .regle.active .n { color: var(--block); }
+  .regle.active .piste i { background: var(--block); }
+  .regle .libelle { font-size: 10px; color: var(--pale); letter-spacing: 0.04em; }
+  @keyframes eclair { 0% { background: var(--block); } 100% { background: transparent; } }
+  .regle.flash { animation: eclair .8s ease-out; }
+
+  /* Rouleau des décisions : chaque ligne s’imprime en haut. */
+  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  th {
+    text-align: left; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--pale); font-weight: 400; padding: 0 8px 8px 0;
+    border-bottom: 1px dashed var(--perfo);
+  }
+  td { padding: 5px 8px 5px 0; border-bottom: 1px dotted var(--perfo); white-space: nowrap; }
+  td.decision { font-weight: 700; }
+  @keyframes impression { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+  tbody tr.neuve { animation: impression .35s ease-out; }
+  .vide { color: var(--pale); padding: 22px 0; }
+
+  .pied { display: flex; gap: 26px; flex-wrap: wrap; font-size: 11px; color: var(--pale); }
+  .pied b { color: var(--encre); font-weight: 700; }
+
+  .pastille { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--pale); margin-right: 6px; vertical-align: middle; }
+  .pastille.vivant { background: var(--accept); }
+  .pastille.mort { background: var(--block); }
+
+  @media (max-width: 860px) {
+    .grille { grid-template-columns: 1fr; }
+    .grille > div { padding: 16px 0 0; border-left: 0; border-top: 1px dashed var(--perfo); }
+    .grille > div:first-child { padding-top: 0; border-top: 0; }
+    td:nth-child(6), th:nth-child(6) { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="feuille">
+
+  <header>
+    <div>
+      <h1>Surveillance des transactions</h1>
+      <div class="sous">Mobile money &middot; décision rendue avant confirmation à l'abonné</div>
+    </div>
+    <div class="horloge">
+      <strong id="total">0</strong>
+      transactions scorées cette heure
+    </div>
+  </header>
+
+  <hr class="perfo">
+
+  <div class="grille">
+
+    <div>
+      <div class="etiquette">Décisions</div>
+      <div class="compte"><span class="a">Acceptées</span><b class="a" id="c-accept">0</b></div>
+      <div class="compte"><span class="r">Mises en revue</span><b class="r" id="c-review">0</b></div>
+      <div class="compte"><span class="b">Bloquées</span><b class="b" id="c-block">0</b></div>
+      <div class="compte" style="margin-top:8px;color:var(--pale)">
+        <span>Dossiers ouverts</span><b id="c-dossiers">0</b>
+      </div>
+    </div>
+
+    <div>
+      <div class="etiquette">Latence de décision</div>
+      <div class="chiffre"><span id="p99">--</span><span class="unite"> ms au 99e centile</span></div>
+      <div class="jauge" id="jauge">
+        <span id="barre" style="width:0"></span>
+        <div class="budget" id="repere"></div>
+      </div>
+      <div class="legende-jauge">
+        <span>0 ms</span>
+        <span>budget {{ budget }} ms</span>
+        <span id="echelle">40 ms</span>
+      </div>
+      <div class="compte" style="color:var(--pale)">
+        <span>Mediane</span><b id="mediane">--</b>
+      </div>
+    </div>
+
+    <div>
+      <div class="etiquette">Moteur</div>
+      <div class="compte"><span>Instance servie</span><b id="instance">--</b></div>
+      <div class="compte"><span>Longueur du flux</span><b id="flux">0</b></div>
+      <div class="compte"><span>Mémoire Redis</span><b id="memoire">--</b></div>
+      <div class="compte" style="margin-top:8px">
+        <span><i class="pastille" id="pastille"></i>État</span><b id="etat">connexion...</b>
+      </div>
+    </div>
+
+  </div>
+
+  <hr class="perfo">
+
+  <div class="etiquette">Règles déclenchées cette heure</div>
+  <div id="regles"></div>
+
+  <hr class="perfo">
+
+  <div class="etiquette">Dernières décisions</div>
+  <table>
+    <thead>
+      <tr>
+        <th>Transaction</th><th>Émetteur</th><th>Montant</th>
+        <th>Décision</th><th>Score</th><th>Règles</th><th>Latence</th><th>Instance</th>
+      </tr>
+    </thead>
+    <tbody id="rouleau">
+      <tr><td colspan="8" class="vide">En attente de trafic.</td></tr>
+    </tbody>
+  </table>
+
+  <hr class="perfo">
+
+  <div class="pied">
+    <span>Seuils &middot; revue à partir de <b>40</b>, blocage à partir de <b>70</b></span>
+    <span>Rafraîchissement <b>1 s</b></span>
+    <span>Console servie par <b>{{ instance }}</b></span>
+  </div>
+
+</div>
+
+<script>
+(function () {
+  const CODES = ["R01","R02","R03","R04","R05","R06","R07","R08"];
+  const ECHELLE_MS = 40;
+  const BUDGET = Number("{{ budget }}") || 20;
+
+  const $ = (id) => document.getElementById(id);
+  let libelles = {};
+  let derniersCompteurs = {};
+  let dernierId = null;
+
+  $("repere").style.left = (BUDGET / ECHELLE_MS * 100) + "%";
+  $("echelle").textContent = ECHELLE_MS + " ms";
+
+  function construireRegles() {
+    $("regles").innerHTML = CODES.map((code) => `
+      <div class="regle" id="regle-${code}">
+        <code>${code}</code>
+        <div>
+          <div class="piste"><i></i></div>
+          <div class="libelle" id="lib-${code}"></div>
+        </div>
+        <span class="n">0</span>
+      </div>`).join("");
+  }
+
+  function majRegles(compteurs) {
+    const maximum = Math.max(1, ...CODES.map((c) => compteurs[c] || 0));
+    CODES.forEach((code) => {
+      const valeur = compteurs[code] || 0;
+      const ligne = $("regle-" + code);
+      ligne.querySelector(".piste i").style.width = (valeur / maximum * 100) + "%";
+      ligne.querySelector(".n").textContent = valeur;
+      ligne.classList.toggle("active", valeur > 0);
+      $("lib-" + code).textContent = libelles[code] || "";
+
+      if (derniersCompteurs[code] !== undefined && valeur > derniersCompteurs[code]) {
+        ligne.classList.remove("flash");
+        void ligne.offsetWidth;
+        ligne.classList.add("flash");
+      }
+    });
+    derniersCompteurs = compteurs;
+  }
+
+  function formaterMontant(v) {
+    return new Intl.NumberFormat("fr-FR").format(v) + " F";
+  }
+
+  function classeDecision(d) {
+    return d === "ACCEPT" ? "a" : d === "REVIEW" ? "r" : "b";
+  }
+
+  function majRouleau(lignes) {
+    if (!lignes.length) return;
+    const nouveau = lignes[0].id !== dernierId;
+    dernierId = lignes[0].id;
+
+    $("rouleau").innerHTML = lignes.map((t, i) => `
+      <tr class="${nouveau && i === 0 ? "neuve" : ""}">
+        <td>${t.tx_id || "--"}</td>
+        <td>${t.msisdn || "--"}</td>
+        <td>${formaterMontant(t.montant)}</td>
+        <td class="decision ${classeDecision(t.decision)}">${t.decision}</td>
+        <td>${t.score}</td>
+        <td>${t.regles.length ? t.regles.join(" ") : "&mdash;"}</td>
+        <td>${t.latence_ms.toFixed(2)} ms</td>
+        <td>${t.instance || "--"}</td>
+      </tr>`).join("");
+  }
+
+  async function rafraichir() {
+    try {
+      const reponse = await fetch("/v1/stats", { cache: "no-store" });
+      if (!reponse.ok) throw new Error("statut " + reponse.status);
+      const d = await reponse.json();
+
+      libelles = d.libelles || {};
+      $("total").textContent = d.decisions.total;
+      $("c-accept").textContent = d.decisions.accept;
+      $("c-review").textContent = d.decisions.review;
+      $("c-block").textContent = d.decisions.block;
+      $("c-dossiers").textContent = d.flux.dossiers_ouverts;
+      $("flux").textContent = d.flux.longueur;
+      $("memoire").textContent = d.memoire_redis || "--";
+      $("instance").textContent = reponse.headers.get("X-Instance") || d.instance;
+
+      const p99 = d.latence.p99_ms;
+      $("p99").textContent = p99 === null ? "--" : p99.toFixed(1);
+      $("mediane").textContent = d.latence.mediane_ms === null
+        ? "--" : d.latence.mediane_ms.toFixed(1) + " ms";
+      const largeur = p99 === null ? 0 : Math.min(100, p99 / ECHELLE_MS * 100);
+      $("barre").style.width = largeur + "%";
+      $("jauge").classList.toggle("depasse", p99 !== null && p99 > BUDGET);
+
+      majRegles(d.regles || {});
+      majRouleau(d.dernieres || []);
+
+      $("pastille").className = "pastille vivant";
+      $("etat").textContent = "en service";
+    } catch (erreur) {
+      $("pastille").className = "pastille mort";
+      $("etat").textContent = "moteur injoignable";
+    }
+  }
+
+  construireRegles();
+  rafraichir();
+  setInterval(rafraichir, 1000);
+})();
+</script>
+</body>
+</html>

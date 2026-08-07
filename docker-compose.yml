@@ -1,0 +1,145 @@
+# Architecture de demonstration : Apache en repartiteur de charge devant trois
+# instances Django, Redis Stack comme base metier, PostgreSQL pour le froid.
+#
+# Demarrage :  docker compose up --build
+# Console     : http://localhost:8080/console/
+
+services:
+
+  # ------------------------------------------------------------------
+  # Repartiteur de charge
+  # ------------------------------------------------------------------
+  apache:
+    image: httpd:2.4
+    container_name: momo_apache
+    ports:
+      - "8080:80"
+    volumes:
+      - ./apache/httpd.conf:/usr/local/apache2/conf/httpd.conf:ro
+    depends_on:
+      web1:
+        condition: service_started
+      web2:
+        condition: service_started
+      web3:
+        condition: service_started
+    networks: [momo]
+
+  # ------------------------------------------------------------------
+  # Base metier : Redis Stack embarque RedisBloom et RedisTimeSeries
+  # ------------------------------------------------------------------
+  redis:
+    image: redis/redis-stack-server:7.4.0-v1
+    container_name: momo_redis
+    environment:
+      REDIS_ARGS: >-
+        --requirepass ${REDIS_PASSWORD:-momo2026}
+        --appendonly yes
+        --appendfsync everysec
+        --maxmemory 512mb
+        --maxmemory-policy volatile-ttl
+        --slowlog-log-slower-than 10000
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a ${REDIS_PASSWORD:-momo2026} PING | grep -q PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 20s
+    networks: [momo]
+
+  # ------------------------------------------------------------------
+  # Persistance froide : audit reglementaire et dossiers de fraude clos
+  # ------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: momo_postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-momo}
+      POSTGRES_USER: ${POSTGRES_USER:-momo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-momo2026}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-momo}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks: [momo]
+
+  # ------------------------------------------------------------------
+  # Trois instances applicatives identiques derriere le repartiteur
+  # ------------------------------------------------------------------
+  web1: &web
+    build: ./app
+    container_name: momo_web1
+    environment: &web_env
+      NOM_INSTANCE: web1
+      REDIS_URL: redis://:${REDIS_PASSWORD:-momo2026}@redis:6379/0
+      POSTGRES_HOST: postgres
+      POSTGRES_DB: ${POSTGRES_DB:-momo}
+      POSTGRES_USER: ${POSTGRES_USER:-momo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-momo2026}
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-cle-de-demonstration-a-remplacer}
+      DJANGO_DEBUG: "0"
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    command:
+      - sh
+      - -c
+      - |
+        python manage.py migrate --noinput
+        python manage.py init_redis
+        exec gunicorn config.wsgi:application \
+          --bind=0.0.0.0:8000 \
+          --workers=4 \
+          --worker-class=gthread \
+          --threads=8 \
+          --access-logfile=- \
+          --log-level=debug
+    networks: [momo]
+
+  web2:
+    <<: *web
+    container_name: momo_web2
+    environment:
+      <<: *web_env
+      NOM_INSTANCE: web2
+
+  web3:
+    <<: *web
+    container_name: momo_web3
+    environment:
+      <<: *web_env
+      NOM_INSTANCE: web3
+
+  # ------------------------------------------------------------------
+  # Consommateur du flux : enrichissement et archivage hors chemin critique
+  # ------------------------------------------------------------------
+  worker:
+    build: ./app
+    container_name: momo_worker
+    environment:
+      <<: *web_env
+      NOM_INSTANCE: worker1
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    command: python manage.py consume_stream --nom worker1
+    networks: [momo]
+
+volumes:
+  redis_data:
+  pg_data:
+
+networks:
+  momo:
+    driver: bridge
