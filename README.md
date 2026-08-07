@@ -1,6 +1,6 @@
 # 🛡️ Moteur de scoring anti-fraude Mobile Money
 
-> **Projet d'examen — Bases de données NoSQL**  
+> **Projet d'examen : Bases de données NoSQL**  
 > Master Intelligence Artificielle — Dakar Institute of Technology  
 > Année académique **2025–2026**
 
@@ -8,7 +8,7 @@
 
 ---
 
-## 📌 Contexte
+##  Contexte
 
 Chaque transaction Mobile Money doit être **acceptée**, **mise en revue** ou **bloquée** avant que l'abonné ne voie son écran de confirmation.
 
@@ -25,7 +25,7 @@ Ces calculs reposent principalement sur des **fenêtres temporelles glissantes**
 
 ---
 
-## ⚡ Contraintes du système
+##  Contraintes du système
 
 | Contrainte | Valeur cible | Conséquence technique |
 |---|---:|---|
@@ -39,7 +39,7 @@ Redis est utilisé comme **base métier temps réel** afin de maintenir ces info
 
 ---
 
-## 🧠 Les 8 règles de détection
+##  Les 8 règles de détection
 
 | Code | Règle de fraude | Structure Redis |
 |:---:|---|---|
@@ -63,7 +63,7 @@ Le moteur utilise également :
 
 ---
 
-# 🚀 Démarrage rapide
+#  Démarrage rapide
 
 ## 1. Préparer l'environnement
 
@@ -81,12 +81,12 @@ Une fois les conteneurs démarrés :
 
 | Service | Adresse |
 |---|---|
-| 🖥️ Console de supervision | http://localhost:8080/console/ |
-| ⚖️ État du répartiteur Apache | http://localhost:8080/balancer-manager |
+|  Console de supervision | http://localhost:8080/console/ |
+|  État du répartiteur Apache | http://localhost:8080/balancer-manager |
 
 ---
 
-# 🧪 Commandes utiles
+#  Commandes utiles
 
 ## Initialiser Redis
 
@@ -162,7 +162,7 @@ curl -s http://localhost:8080/v1/abonnes/22997000051 | python -m json.tool
 
 ---
 
-# 💸 Soumettre une transaction
+#  Soumettre une transaction
 
 ```bash
 curl -s -X POST http://localhost:8080/v1/transactions \
@@ -178,7 +178,7 @@ curl -s -X POST http://localhost:8080/v1/transactions \
 
 ---
 
-# 📂 Structure du projet
+#  Structure du projet
 
 ```text
 .
@@ -224,7 +224,7 @@ curl -s -X POST http://localhost:8080/v1/transactions \
 
 ---
 
-# ⚠️ Limites de la démonstration
+#  Limites de la démonstration
 
 Cette implémentation constitue un **prototype académique**. Certaines fonctionnalités prévues pour une architecture de production ne sont volontairement pas déployées.
 
@@ -252,6 +252,6 @@ Le prototype ne mesure pas encore la précision et le rappel. Une évaluation co
 
 ---
 
-## 🎯 Objectif du prototype
+##  Objectif du prototype
 
 L'objectif n'est pas de reproduire l'intégralité d'une plateforme Mobile Money en production, mais de démontrer comment les structures de données Redis peuvent être combinées pour construire un **moteur de scoring anti-fraude à faible latence**, capable d'exploiter le comportement récent d'un compte en temps réel.
