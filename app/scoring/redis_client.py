@@ -15,11 +15,11 @@ Deux points de conception a savoir defendre en soutenance.
 """
 
 from __future__ import annotations
-
+from redis.sentinel import Sentinel
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
-
+import os
 import redis
 from django.conf import settings
 
@@ -30,14 +30,27 @@ _sha_scoring: str | None = None
 CHEMIN_LUA = Path(__file__).resolve().parent / "lua" / "scoring.lua"
 
 
-def client() -> redis.Redis:
-    """Connexion Redis unique par processus, avec pool integre."""
+def client() -> "redis.Redis":
+    """Connexion Redis via Sentinel, unique par processus, avec pool intégré."""
     global _connexion
     if _connexion is None:
         with _verrou:
             if _connexion is None:
-                _connexion = redis.Redis.from_url(
-                    settings.REDIS_URL,
+                # Récupère la liste des Sentinels depuis l'environnement
+                sentinels = [
+                    (host, int(port))
+                    for host, port in (s.split(":") for s in os.environ["REDIS_SENTINELS"].split(","))
+                ]
+                master_name = os.environ.get("REDIS_MASTER_NAME", "mymaster")
+                password = os.environ.get("REDIS_PASSWORD", "momo2026")
+
+                sentinel = Sentinel(sentinels, socket_timeout=2)
+
+                # Connexion au maître (le client interroge Sentinel et se connecte au bon Redis)
+                _connexion = sentinel.master_for(
+                    master_name,
+                    password=password,
+                    db=0,
                     decode_responses=True,
                     socket_timeout=2,
                     socket_connect_timeout=2,

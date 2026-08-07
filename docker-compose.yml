@@ -1,14 +1,4 @@
-# Architecture de demonstration : Apache en repartiteur de charge devant trois
-# instances Django, Redis Stack comme base metier, PostgreSQL pour le froid.
-#
-# Demarrage :  docker compose up --build
-# Console     : http://localhost:8080/console/
-
 services:
-
-  # ------------------------------------------------------------------
-  # Repartiteur de charge
-  # ------------------------------------------------------------------
   apache:
     image: httpd:2.4
     container_name: momo_apache
@@ -24,35 +14,81 @@ services:
       web3:
         condition: service_started
     networks: [momo]
-
+  
   # ------------------------------------------------------------------
-  # Base metier : Redis Stack embarque RedisBloom et RedisTimeSeries
+  # Nœud 1 : Redis + Sentinel
   # ------------------------------------------------------------------
-  redis:
+  redis_node1:
     image: redis/redis-stack-server:7.4.0-v1
-    container_name: momo_redis
-    environment:
-      REDIS_ARGS: >-
-        --requirepass ${REDIS_PASSWORD:-momo2026}
-        --appendonly yes
-        --appendfsync everysec
-        --maxmemory 512mb
-        --maxmemory-policy volatile-ttl
-        --slowlog-log-slower-than 10000
+    command: >
+      sh -c "
+      redis-server /etc/redis/redis-conf/redis.conf &
+      redis-sentinel /etc/redis/redis-conf/sentinel.conf --sentinel
+      "
     volumes:
-      - redis_data:/data
-    ports:
-      - "6379:6379"
+      - ./config/master/:/etc/redis/redis-conf/
+      - redis1_data:/data
     healthcheck:
       test: ["CMD-SHELL", "redis-cli -a ${REDIS_PASSWORD:-momo2026} PING | grep -q PONG"]
       interval: 5s
       timeout: 3s
       retries: 20
       start_period: 20s
+    ports:
+      - "6379:6379"
+      - "26379:26379"
     networks: [momo]
 
   # ------------------------------------------------------------------
-  # Persistance froide : audit reglementaire et dossiers de fraude clos
+  # Nœud 2 : Redis + Sentinel
+  # ------------------------------------------------------------------
+  redis_node2:
+    image: redis/redis-stack-server:7.4.0-v1
+    command: >
+      sh -c "
+      redis-server /etc/redis/redis-conf/redis.conf &
+      redis-sentinel /etc/redis/redis-conf/sentinel.conf --sentinel
+      "
+    volumes:
+      - ./config/slave2:/etc/redis/redis-conf
+      - redis2_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a ${REDIS_PASSWORD:-momo2026} PING | grep -q PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 20s
+    ports:
+      - "6380:6379"
+      - "26380:26379"
+    networks: [momo]
+
+  # ------------------------------------------------------------------
+  # Nœud 3 : Redis + Sentinel
+  # ------------------------------------------------------------------
+  redis_node3:
+    image: redis/redis-stack-server:7.4.0-v1
+    command: >
+      sh -c "
+      redis-server /etc/redis/redis-conf/redis.conf &
+      redis-sentinel /etc/redis/redis-conf/sentinel.conf --sentinel
+      "
+    volumes:
+      - ./config/slave3:/etc/redis/redis-conf
+      - redis3_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a ${REDIS_PASSWORD:-momo2026} PING | grep -q PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 20s
+    ports:
+      - "6381:6379"
+      - "26381:26379"
+    networks: [momo]
+
+  # ------------------------------------------------------------------
+  # PostgreSQL et tes applis restent inchangés
   # ------------------------------------------------------------------
   postgres:
     image: postgres:16-alpine
@@ -70,15 +106,15 @@ services:
       retries: 10
     networks: [momo]
 
-  # ------------------------------------------------------------------
-  # Trois instances applicatives identiques derriere le repartiteur
-  # ------------------------------------------------------------------
   web1: &web
     build: ./app
     container_name: momo_web1
     environment: &web_env
       NOM_INSTANCE: web1
-      REDIS_URL: redis://:${REDIS_PASSWORD:-momo2026}@redis:6379/0
+      REDIS_SENTINELS: redis_node1:26379,redis_node2:26380,redis_node3:26381
+      REDIS_MASTER_NAME: mymaster
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-momo2026}
+      #REDIS_URL: redis://:${REDIS_PASSWORD:-momo2026}@redis_node1:26379/0
       POSTGRES_HOST: postgres
       POSTGRES_DB: ${POSTGRES_DB:-momo}
       POSTGRES_USER: ${POSTGRES_USER:-momo}
@@ -86,7 +122,7 @@ services:
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-cle-de-demonstration-a-remplacer}
       DJANGO_DEBUG: "0"
     depends_on:
-      redis:
+      redis_node1:
         condition: service_healthy
       postgres:
         condition: service_healthy
@@ -119,9 +155,6 @@ services:
       <<: *web_env
       NOM_INSTANCE: web3
 
-  # ------------------------------------------------------------------
-  # Consommateur du flux : enrichissement et archivage hors chemin critique
-  # ------------------------------------------------------------------
   worker:
     build: ./app
     container_name: momo_worker
@@ -129,7 +162,7 @@ services:
       <<: *web_env
       NOM_INSTANCE: worker1
     depends_on:
-      redis:
+      redis_node1:
         condition: service_healthy
       postgres:
         condition: service_healthy
@@ -137,7 +170,9 @@ services:
     networks: [momo]
 
 volumes:
-  redis_data:
+  redis1_data:
+  redis2_data:
+  redis3_data:
   pg_data:
 
 networks:

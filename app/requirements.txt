@@ -3,3 +3,4 @@ djangorestframework==3.15.1
 gunicorn==22.0.0
 redis==5.0.4
 psycopg[binary]==3.1.19
+django-redis

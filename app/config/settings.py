@@ -68,12 +68,23 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # --------------------------------------------------------------------------
 # Redis
 # --------------------------------------------------------------------------
-REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+#REDIS_URL = os.environ.get("REDIS_URL", "redis://redis_node1:26379/0")
 
 CACHES = {
     "default": {
-        "BACKEND": "django.core.cache.backends.redis.RedisCache",
-        "LOCATION": REDIS_URL,
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": [
+            # Liste des Sentinels disponibles
+            ("redis_node1", 26379),
+            ("redis_node2", 26380),
+            ("redis_node3", 26381),
+        ],
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.SentinelClient",
+            "SENTINEL_MASTER": os.environ["REDIS_MASTER_NAME"],
+            "PASSWORD": os.environ["REDIS_PASSWORD"],
+            "DB": 0,
+        }
     }
 }
 
