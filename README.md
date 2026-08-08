@@ -157,7 +157,7 @@ docker compose exec web1 python manage.py simulate --charge 200 --duree 120
 #  Inspecter les données Redis d'un abonné
 
 ```bash
-curl -s http://localhost:8080/v1/abonnes/22997000051 | python -m json.tool
+curl -s http://localhost:8081/v1/abonnes/22997000051 | python -m json.tool
 ```
 
 ---
@@ -165,7 +165,7 @@ curl -s http://localhost:8080/v1/abonnes/22997000051 | python -m json.tool
 #  Soumettre une transaction
 
 ```bash
-curl -s -X POST http://localhost:8080/v1/transactions \
+curl -s -X POST http://localhost:8081/v1/transactions \
   -H 'Content-Type: application/json' \
   -d '{
     "msisdn": "22997000042",
