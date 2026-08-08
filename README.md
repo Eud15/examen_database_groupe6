@@ -81,8 +81,8 @@ Une fois les conteneurs démarrés :
 
 | Service | Adresse |
 |---|---|
-|  Console de supervision | http://localhost:8080/console/ |
-|  État du répartiteur Apache | http://localhost:8080/balancer-manager |
+|  Console de supervision | http://localhost:8081/console/ |
+|  État du répartiteur Apache | http://localhost:8081/balancer-manager |
 
 ---
 
@@ -157,7 +157,7 @@ docker compose exec web1 python manage.py simulate --charge 200 --duree 120
 #  Inspecter les données Redis d'un abonné
 
 ```bash
-curl -s http://localhost:8080/v1/abonnes/22997000051 | python -m json.tool
+curl -s http://localhost:8081/v1/abonnes/22997000051 | python -m json.tool
 ```
 
 ---
@@ -165,7 +165,7 @@ curl -s http://localhost:8080/v1/abonnes/22997000051 | python -m json.tool
 #  Soumettre une transaction
 
 ```bash
-curl -s -X POST http://localhost:8080/v1/transactions \
+curl -s -X POST http://localhost:8081/v1/transactions \
   -H 'Content-Type: application/json' \
   -d '{
     "msisdn": "22997000042",
@@ -187,13 +187,22 @@ curl -s -X POST http://localhost:8080/v1/transactions \
 ├── apache/
 │   └── httpd.conf
 │
-├── redis/
-│   └── redis-stack.conf
+├── config/
+│   ├── master/
+│   │   ├── redis.conf
+│   │   └── sentinel.conf
+│   ├── slave2/
+│   │   ├── redis.conf
+│   │   └── sentinel.conf
+│   └── slave3/
+│       ├── redis.conf
+│       └── sentinel.conf
 │
 ├── app/
 │   └── scoring/
 │       ├── lua/
 │       │   └── scoring.lua
+│       ├── redis_client.py
 │       ├── engine.py
 │       ├── views.py
 │       └── management/
@@ -211,10 +220,11 @@ curl -s -X POST http://localhost:8080/v1/transactions \
 
 | Fichier | Rôle |
 |---|---|
-| `docker-compose.yml` | Déploiement de la pile complète |
+| `docker-compose.yml` | Déploiement de la pile complète (3 nœuds Redis + Sentinel, Apache, PostgreSQL, 3 instances Django) |
 | `apache/httpd.conf` | Reverse proxy et répartition Round Robin |
-| `redis/redis-stack.conf` | Configuration de Redis Stack |
+| `config/master/`, `config/slave2/`, `config/slave3/` | Configuration Redis et Sentinel de chacun des 3 nœuds |
 | `app/scoring/lua/scoring.lua` | Script atomique au cœur du moteur |
+| `app/scoring/redis_client.py` | Connexion applicative via Sentinel (découverte automatique du master courant) |
 | `app/scoring/engine.py` | Orchestration du scoring et règles complémentaires |
 | `app/scoring/views.py` | API et console de supervision |
 | `app/scoring/management/` | Initialisation et simulations |
@@ -224,13 +234,29 @@ curl -s -X POST http://localhost:8080/v1/transactions \
 
 ---
 
+# Architecture Redis : réplication et bascule automatique
+
+Le projet déploie un **master et deux répliques**, chacun surveillé par une instance **Redis Sentinel** embarquée (`redis_node1`, `redis_node2`, `redis_node3`). Les trois Sentinels s'accordent par quorum (2 sur 3) pour détecter une panne du master et promouvoir automatiquement l'une des répliques, sans intervention manuelle.
+
+L'application ne se connecte jamais à une adresse Redis fixe : `redis_client.py` interroge Sentinel via `sentinel.master_for(...)`, qui retourne à tout moment l'adresse du master courant. En cas de bascule, les instances Django et le worker d'archivage retrouvent le nouveau master automatiquement, sans redémarrage.
+
+**Vérifier l'état de la réplication :**
+```bash
+docker compose exec redis_node1 redis-cli -a momo2026 INFO replication
+```
+`connected_slaves:2` et les deux répliques en `state=online` confirment un cluster sain.
+
+**Ce que ce montage ne couvre pas encore** : il s'agit de réplication et de haute disponibilité, pas d'un véritable Redis Cluster avec partitionnement des données sur plusieurs masters (sharding). Les hash tags (`{msisdn}`) utilisés dans les clés anticipent ce passage à l'échelle mais ne l'implémentent pas ici — les trois nœuds portent l'intégralité du même jeu de données, pas des portions distinctes.
+
+---
+
 #  Limites de la démonstration
 
 Cette implémentation constitue un **prototype académique**. Certaines fonctionnalités prévues pour une architecture de production ne sont volontairement pas déployées.
 
 **Redis Cluster**
 
-Le projet ne déploie pas de véritable Redis Cluster. La conception anticipe cependant le partitionnement grâce aux **hash tags Redis**. La démonstration fonctionne sur une instance unique.
+Le projet ne déploie pas de véritable Redis Cluster (partitionnement des données sur plusieurs masters). Il déploie en revanche une **réplication maître-répliques avec bascule automatique via Sentinel** (voir la section *Architecture Redis* ci-dessus) — les trois nœuds portent le même jeu de données complet, pas des portions distinctes. La conception anticipe le passage à un vrai partitionnement grâce aux **hash tags Redis** (`{msisdn}`), déjà en place dans le nommage des clés, mais celui-ci n'est pas implémenté dans cette démonstration.
 
 **Authentification de l'API**
 
