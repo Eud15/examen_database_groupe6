@@ -3,7 +3,7 @@ services:
     image: httpd:2.4
     container_name: momo_apache
     ports:
-      - "8080:80"
+      - "8081:80" 
     volumes:
       - ./apache/httpd.conf:/usr/local/apache2/conf/httpd.conf:ro
     depends_on:
