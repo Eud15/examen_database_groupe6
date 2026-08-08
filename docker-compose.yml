@@ -111,7 +111,7 @@ services:
     container_name: momo_web1
     environment: &web_env
       NOM_INSTANCE: web1
-      REDIS_SENTINELS: redis_node1:26379,redis_node2:26380,redis_node3:26381
+      REDIS_SENTINELS: redis_node1:26379,redis_node2:26379,redis_node3:26379
       REDIS_MASTER_NAME: mymaster
       REDIS_PASSWORD: ${REDIS_PASSWORD:-momo2026}
       #REDIS_URL: redis://:${REDIS_PASSWORD:-momo2026}@redis_node1:26379/0
