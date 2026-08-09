@@ -1,7 +1,7 @@
 #  Moteur de scoring anti-fraude Mobile Money
 
 > **Projet d'examen : Bases de données NoSQL**  
-> Master Intelligence Artificielle — Dakar Institute of Technology  
+> Master Intelligence Artificielle : Dakar Institute of Technology  
 > Année académique **2025–2026**
 
 **Base de données retenue : Redis**
